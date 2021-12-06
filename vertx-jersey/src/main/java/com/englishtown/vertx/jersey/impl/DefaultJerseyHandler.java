@@ -29,6 +29,8 @@ import com.englishtown.vertx.jersey.VertxContainer;
 import com.englishtown.vertx.jersey.inject.ContainerResponseWriterProvider;
 import com.englishtown.vertx.jersey.inject.VertxRequestProcessor;
 import com.englishtown.vertx.jersey.security.DefaultSecurityContext;
+import com.google.common.base.Strings;
+
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.vertx.core.Handler;
@@ -159,6 +161,14 @@ public class DefaultJerseyHandler implements JerseyHandler {
     ) {
 
         URI uri = getAbsoluteURI(vertxRequest);
+        if (uri == null) {
+            vertxRequest.response()
+                    .setStatusCode(HttpResponseStatus.NOT_FOUND.code())
+                    .end();
+
+            return;
+        }
+
         boolean isSecure = "https".equalsIgnoreCase(uri.getScheme());
 
         UriBuilder baseUriBuilder = UriBuilder.fromUri(uri)
@@ -182,8 +192,15 @@ public class DefaultJerseyHandler implements JerseyHandler {
         URI absoluteUri;
         String hostAndPort = vertxRequest.headers().get(HttpHeaders.HOST);
 
+        String vertxAbsoluteUri = vertxRequest.absoluteURI();
+        if (Strings.isNullOrEmpty(vertxAbsoluteUri)) {
+            // handle vert.x issue https://github.com/eclipse-vertx/vert.x/issues/2797
+            logger.debug("Invalid URI: " + vertxRequest.uri());
+            return null;
+        }
+
         try {
-            absoluteUri = URI.create(vertxRequest.absoluteURI());
+            absoluteUri = URI.create(vertxAbsoluteUri);
 
             if (hostAndPort != null && !hostAndPort.isEmpty()) {
                 String[] parts = hostAndPort.split(":");
